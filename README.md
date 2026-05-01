@@ -8,6 +8,8 @@ Added multiple spawn locations for new players, so they can randomly spawn rathe
     vector4(1237.5671, -1301.8521, 76.9192, 133.9272),   -- Rhodes Train Station 
     vector4(2929.7390, 1270.4764, 44.6728, 253.0386),    -- Annesburg Train Station
 
+Also, added Discord Logs when a new & existing player spawn / despawn from the server. 
+
 🌅 rsg-spawn
 
 Spawn/respawn flow for RedM servers using RSG Core.

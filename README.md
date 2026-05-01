@@ -52,6 +52,4 @@ New Player
 
 Original RSG adaptation by Rexshack Gaming
 
-License: GPL‑3.0
-
 RexShack - https://github.com/Rexshack-RedM/rsg-core

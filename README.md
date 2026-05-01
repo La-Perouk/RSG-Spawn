@@ -52,4 +52,4 @@ New Player
 
 Original RSG adaptation by Rexshack Gaming
 
-RexShack - https://github.com/Rexshack-RedM/rsg-core
+RexShack - https://github.com/Rexshack-RedM

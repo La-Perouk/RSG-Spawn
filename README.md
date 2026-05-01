@@ -5,7 +5,9 @@ Added multiple spawn locations for new players, so they can randomly spawn rathe
 🌅 rsg-spawn
 
 Spawn/respawn flow for RedM servers using RSG Core.
+
 Simple, fast, and polished spawn pipeline for both new and existing players.
+
 Displays localized loading info, applies saved appearance, places the player at a configured spawn, and triggers RSGCore lifecycle events.
 
 🛠️ Dependencies

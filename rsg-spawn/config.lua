@@ -4,7 +4,7 @@ Config = {}
 Config.AutoDualWield = true
 
 -- Discord Logs
-Config.DiscordWebhook = 'https://discord.com/api/webhooks/1492288797310718053/hKkm49J1K3K0dkrw6yHj99vuF-2kWejrInyVqzSGrEPjFO9ETmbOzxHMcYBukItK6y-P'
+Config.DiscordWebhook = ''
 
 -- spawn location
 Config.SpawnLocations = {

@@ -18,7 +18,8 @@ RegisterNetEvent('rsg-spawn:client:existingplayer', function()
     local citizenid = PlayerData.citizenid
     local randomIndex = math.random(1, #Config.RandomTips)
     local randomTip = Config.RandomTips[randomIndex]
-    Citizen.InvokeNative(0x1E5B70E53DB661E5, 1122662550, 347053089, 0, firstname..' '..lastname, locale('cl_lang_1')..citizenid, locale('cl_lang_2')..' '..randomTip)
+    Citizen.InvokeNative(0x1E5B70E53DB661E5, 1122662550, 347053089, 0, firstname .. ' ' .. lastname,
+        locale('cl_lang_1') .. citizenid, locale('cl_lang_2') .. ' ' .. randomTip)
     Wait(10000)
 
     DoScreenFadeOut(1000)
@@ -32,7 +33,7 @@ RegisterNetEvent('rsg-spawn:client:existingplayer', function()
     SetEntityHeading(playerPed, PlayerData.position.w)
     FreezeEntityPosition(playerPed, false)
     SetEntityVisible(playerPed, true)
-    
+
     if Config.AutoDualWield then
         Wait(2000)
         TriggerEvent('rsg-weapons:client:AutoDualWield')
@@ -42,45 +43,68 @@ RegisterNetEvent('rsg-spawn:client:existingplayer', function()
     DoScreenFadeIn(1000)
     TriggerServerEvent('RSGCore:Server:OnPlayerLoaded')
     TriggerEvent('RSGCore:Client:OnPlayerLoaded')
-
-    TriggerServerEvent('rsg-spawn:server:logExistingSpawn', firstname .. ' ' .. lastname, citizenid)
 end)
 
-RegisterNetEvent('rsg-spawn:client:newplayer', function()
+local function OpenNUI()
+    SetNuiFocus(true, true)
+    SendNUIMessage({
+        type = "OPEN_SPAWN_MENU",
+        locations = Config.SpawnLocations
+    })
+end
+
+local function SpawnChar(coords)
     local PlayerData = RSGCore.Functions.GetPlayerData()
     local firstname = PlayerData.charinfo.firstname
     local lastname = PlayerData.charinfo.lastname
     local citizenid = PlayerData.citizenid
     local randomIndex = math.random(1, #Config.RandomTips)
     local randomTip = Config.RandomTips[randomIndex]
-    Citizen.InvokeNative(0x1E5B70E53DB661E5, 1122662550, 347053089, 0, firstname..' '..lastname, locale('cl_lang_1')..citizenid, locale('cl_lang_2')..' '..randomTip)
+    Citizen.InvokeNative(0x1E5B70E53DB661E5, 1122662550, 347053089, 0, firstname .. ' ' .. lastname,
+        locale('cl_lang_1') .. citizenid, locale('cl_lang_2') .. ' ' .. randomTip)
     Wait(10000)
     DoScreenFadeOut(1000)
 
     exports['rsg-appearance']:ApplySkin()
-    
     local ped = PlayerPedId()
 
-    local randomSpawnIndex = math.random(1, #Config.SpawnLocations)
-    local chosenSpawn = Config.SpawnLocations[randomSpawnIndex]
-
-    SetEntityCoordsNoOffset(ped, chosenSpawn.x, chosenSpawn.y, chosenSpawn.z, true, true, true)
-    SetEntityHeading(ped, chosenSpawn.w)
-
+    SetEntityCoordsNoOffset(ped, coords, true, true, true)
+    SetEntityHeading(ped, coords.w)
     FreezeEntityPosition(ped, false)
-
+    FreezeEntityPosition(ped, false)
     SetEntityVisible(ped, true)
-
     if Config.AutoDualWield then
         Wait(2000)
         TriggerEvent('rsg-weapons:client:AutoDualWield')
     end
-
     ShutdownLoadingScreen()
     ExecuteCommand('revive')
     DoScreenFadeIn(1000)
     TriggerServerEvent('RSGCore:Server:OnPlayerLoaded')
     TriggerEvent('RSGCore:Client:OnPlayerLoaded')
+end
 
-    TriggerServerEvent('rsg-spawn:server:logNewSpawn', PlayerData.charinfo.firstname .. ' ' .. PlayerData.charinfo.lastname, PlayerData.citizenid, randomSpawnIndex)
+RegisterNUICallback('spawnSelected', function(data, cb)
+    SetNuiFocus(false, false)
+    SendNUIMessage({ type = "CLOSE_MENU" })
+
+    local chosenId = data.locationId
+
+    for _, loc in pairs(Config.SpawnLocations) do
+        if loc.id == chosenId then
+            SpawnChar(loc.coords)
+            break
+        end
+    end
+
+    cb('ok')
+end)
+
+
+RegisterNetEvent('rsg-spawn:client:newplayer', function()
+    if not Config.SelectLocations then
+        SpawnChar(Config.SpawnLocation.coords)
+    else
+        OpenNUI()
+    end
 end)

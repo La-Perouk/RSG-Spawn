@@ -53,7 +53,7 @@ local function OpenNUI()
     })
 end
 
-local function SpawnChar(coords)
+local function SpawnChar(coords, chosenId)  
     local PlayerData = RSGCore.Functions.GetPlayerData()
     local firstname = PlayerData.charinfo.firstname
     local lastname = PlayerData.charinfo.lastname
@@ -71,7 +71,6 @@ local function SpawnChar(coords)
     SetEntityCoordsNoOffset(ped, coords, true, true, true)
     SetEntityHeading(ped, coords.w)
     FreezeEntityPosition(ped, false)
-    FreezeEntityPosition(ped, false)
     SetEntityVisible(ped, true)
     if Config.AutoDualWield then
         Wait(2000)
@@ -79,6 +78,9 @@ local function SpawnChar(coords)
     end
     ShutdownLoadingScreen()
     ExecuteCommand('revive')
+    
+    TriggerServerEvent('rsg-spawn:server:logNewSpawn', firstname .. ' ' .. lastname, citizenid, chosenId)
+    
     DoScreenFadeIn(1000)
     TriggerServerEvent('RSGCore:Server:OnPlayerLoaded')
     TriggerEvent('RSGCore:Client:OnPlayerLoaded')
@@ -92,7 +94,7 @@ RegisterNUICallback('spawnSelected', function(data, cb)
 
     for _, loc in pairs(Config.SpawnLocations) do
         if loc.id == chosenId then
-            SpawnChar(loc.coords)
+            SpawnChar(loc.coords, chosenId)  
             break
         end
     end
@@ -100,11 +102,6 @@ RegisterNUICallback('spawnSelected', function(data, cb)
     cb('ok')
 end)
 
-
 RegisterNetEvent('rsg-spawn:client:newplayer', function()
-    if not Config.SelectLocations then
-        SpawnChar(Config.SpawnLocation.coords)
-    else
-        OpenNUI()
-    end
+    OpenNUI()
 end)

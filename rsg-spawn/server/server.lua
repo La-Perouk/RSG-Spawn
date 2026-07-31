@@ -1,6 +1,6 @@
 local RSGCore = exports['rsg-core']:GetCoreObject()
-local webhook = Config.DiscordWebhook or 'YOUR_DISCORD_WEBHOOK_URL'
 
+-- Shared Helper Functions
 local function ParseIdentifiers(src)
     local identifiers = GetPlayerIdentifiers(src)
     local discordId, discordName = 'N/A', 'N/A'
@@ -14,7 +14,7 @@ local function ParseIdentifiers(src)
         elseif string.find(id, 'steam:') then
             steamId = id
             local steamHex = tonumber(steamId:gsub("steam:", ""), 16) or 0
-            steamProfile = steamHex ~= 0 and string.format("https://steamcommunity.com/profiles/%d", steamHex) or "N/A"
+            steamProfile = steamHex ~= 0 and string.format("https://steamcommunity.com", steamHex) or "N/A"
         end
     end
 
@@ -30,25 +30,84 @@ local function GetPlayerCoords(src)
     return 'Unknown'
 end
 
--- NEW SPAWN (with location)
-RegisterNetEvent('rsg-spawn:server:logNewSpawn', function(playerName, citizenid, spawnIndex)
+local function GetWebhook(channel)
+    if Config.DiscordWebhook and type(Config.DiscordWebhook) == "table" then
+        return Config.DiscordWebhook[channel] or Config.DiscordWebhook['default']
+    elseif type(Config.DiscordWebhook) == "string" then
+        return Config.DiscordWebhook
+    end
+    return 'YOUR_DEFAULT_WEBHOOK_URL'
+end
+
+-- Existing Player Login Logs
+RegisterNetEvent('RSGCore:Server:OnPlayerLoaded', function()
     local src = source
-    local serverId = src
+    SetTimeout(500, function()
+        local Player = RSGCore.Functions.GetPlayer(src)
+        if not Player then return end
+
+        local inGameName = Player.PlayerData.charinfo.firstname .. ' ' .. Player.PlayerData.charinfo.lastname
+        local citizenid = Player.PlayerData.citizenid
+        local coords = GetPlayerCoords(src)
+        
+        local jobLabel = "Unknown"
+        if Player.PlayerData.job and Player.PlayerData.job.name then
+            jobLabel = Player.PlayerData.job.label
+        end
+        
+        local discordId, discordName, steamId, steamName, steamProfile = ParseIdentifiers(src)
+        local profileLink = steamProfile ~= 'N/A' and ('[Click Here To View](' .. steamProfile .. ')') or 'N/A'
+        
+        local fields = {
+            { name = 'Player ID', value = tostring(src), inline = true },
+            { name = 'Character Name', value = inGameName, inline = true },
+            { name = 'CitizenID', value = citizenid, inline = true },
+            { name = 'Discord Name', value = discordName, inline = true },
+            { name = 'Discord ID', value = discordId, inline = true },
+            { name = 'Steam Name', value = steamName, inline = true },
+            { name = 'Steam ID', value = steamId, inline = true },
+            { name = 'Steam Profile', value = profileLink, inline = false },
+            { name = 'Coordinates', value = coords, inline = true }
+        }
+        
+        local embed = { 
+            title = '✅ 🤠 Existing Player Logged In', 
+            fields = fields, 
+            color = 3066993, 
+            footer = { text = os.date('%Y-%m-%d %H:%M:%S') } 
+        }
+        
+        local targetWebhook = GetWebhook('default')
+        PerformHttpRequest(targetWebhook, function() end, 'POST', json.encode({embeds = {embed}}), { ['Content-Type'] = 'application/json' })
+        print('[LOGIN] Existing: ' .. inGameName .. ' (Citizen: ' .. citizenid .. ')')
+    end)
+end)
+
+-- -- New Player Login Logs
+-- New Player Login Logs
+RegisterNetEvent('rsg-spawn:server:logNewSpawn', function(playerName, citizenid, spawnId)
+    local src = source
     local discordId, discordName, steamId, steamName, steamProfile = ParseIdentifiers(src)
     
     local coords = GetPlayerCoords(src)
-    local location = 'Unknown'
-    local index = tonumber(spawnIndex)
-    if index and Config.SpawnLocations and Config.SpawnLocations[index] then
-        location = string.format('%.1f, %.1f', Config.SpawnLocations[index].x, Config.SpawnLocations[index].y)
+    local locationLabel = 'Unknown Location'
+    
+    if Config.SpawnLocations then
+        for _, loc in pairs(Config.SpawnLocations) do
+            if loc.id == spawnId then
+                locationLabel = loc.label
+                break
+            end
+        end
     end
 
     local profileLink = steamProfile ~= 'N/A' and ('[Click Here To View](' .. steamProfile .. ')') or 'N/A'
     
     local fields = {
-        { name = 'Player ID', value = tostring(serverId), inline = true },
-        { name = 'Player Name', value = playerName, inline = true },
+        { name = 'Player ID', value = tostring(src), inline = true },
+        { name = 'Character Name', value = playerName, inline = true },  
         { name = 'CitizenID', value = citizenid, inline = true },
+        { name = 'Spawned At', value = locationLabel, inline = true },  
         { name = 'Discord Name', value = discordName, inline = true },
         { name = 'Discord ID', value = discordId, inline = true },
         { name = 'Steam Name', value = steamName, inline = true },
@@ -63,69 +122,34 @@ RegisterNetEvent('rsg-spawn:server:logNewSpawn', function(playerName, citizenid,
         color = 3447003, 
         footer = { text = os.date('%Y-%m-%d %H:%M:%S') } 
     }
-    PerformHttpRequest(webhook, function() end, 'POST', json.encode({embeds = {embed}}), { ['Content-Type'] = 'application/json' })
-    print(('[SPAWN NEW] %s (Citizen: %s) at spawn %s'):format(playerName, citizenid, spawnIndex))
+    
+    local targetWebhook = GetWebhook('default')
+    PerformHttpRequest(targetWebhook, function() end, 'POST', json.encode({embeds = {embed}}), { ['Content-Type'] = 'application/json' })
+    print(('[SPAWN NEW] %s (Citizen: %s) at spawn %s'):format(playerName, citizenid, spawnId))
 end)
 
--- EXISTING SPAWN
-RegisterNetEvent('rsg-spawn:server:logExistingSpawn', function(playerName, citizenid)
-    local src = source
-    local Player = RSGCore.Functions.GetPlayer(src)
-
-    local serverId = src
-    local coords = GetPlayerCoords(src)
-    local discordId, discordName, steamId, steamName, steamProfile = ParseIdentifiers(src)
-
-    local jobLabel = "Unknown"
-    if Player and Player.PlayerData and Player.PlayerData.job and Player.PlayerData.job.name then
-        jobLabel  = Player.PlayerData.job.label
-    end
-    
-    local profileLink = steamProfile ~= 'N/A' and ('[Click Here To View](' .. steamProfile .. ')') or 'N/A'
-    
-    local fields = {
-        { name = 'Player ID', value = tostring(serverId), inline = true },
-        { name = 'Player Name', value = playerName, inline = true },
-        { name = 'CitizenID', value = citizenid, inline = true },
-        { name = 'Job', value = jobLabel, inline = true },        
-        { name = 'Discord Name', value = discordName, inline = true },
-        { name = 'Discord ID', value = discordId, inline = true },
-        { name = 'Steam Name', value = steamName, inline = true },
-        { name = 'Steam ID', value = steamId, inline = true },
-        { name = 'Steam Profile', value = profileLink, inline = false },
-        { name = 'Coordinates', value = coords, inline = true }
-    }
-    
-    local embed = { 
-        title = '✅ 🤠 Existing Player Spawned', 
-        fields = fields, 
-        color = 3066993, 
-        footer = { text = os.date('%Y-%m-%d %H:%M:%S') } 
-    }
-    PerformHttpRequest(webhook, function() end, 'POST', json.encode({embeds = {embed}}), { ['Content-Type'] = 'application/json' })
-    print('[SPAWN] Existing: ' .. playerName .. ' (Citizen: ' .. citizenid .. ')')
-end)
-
--- LOGOUT
-local cachedNames = {}
-
+-- Existing Player Loggout Logs 
 AddEventHandler('playerDropped', function(reason)
     local src = source
-    local steamName = GetPlayerName(src)
-    
-    local inGameName = 'Unknown (No Character Loaded)'
     local Player = RSGCore.Functions.GetPlayer(src)
     
+    local inGameName = 'Unknown (No Character Loaded)'
+    local citizenid = 'N/A'
+    local jobLabel = "Unknown"
+    local coords = 'Unknown'
+
     if Player then
         inGameName = Player.PlayerData.charinfo.firstname .. ' ' .. Player.PlayerData.charinfo.lastname
-    elseif cachedNames[src] then
-        inGameName = cachedNames[src]
-    end
-    
-    local coords = 'Unknown'
-    if Player and Player.PlayerData.position then
-        local pCoords = Player.PlayerData.position
-        coords = string.format('%.1f, %.1f, %.1f', pCoords.x, pCoords.y, pCoords.z)
+        citizenid = Player.PlayerData.citizenid
+        
+        if Player.PlayerData.job and Player.PlayerData.job.name then
+            jobLabel = Player.PlayerData.job.label
+        end
+
+        if Player.PlayerData.position then
+            local pCoords = Player.PlayerData.position
+            coords = string.format('%.1f, %.1f, %.1f', pCoords.x, pCoords.y, pCoords.z)
+        end
     else
         local ped = GetPlayerPed(src)
         if ped and ped ~= 0 then
@@ -134,75 +158,48 @@ AddEventHandler('playerDropped', function(reason)
         end
     end
     
-    local jobLabel = "Unknown"
-    if Player and Player.PlayerData and Player.PlayerData.job and Player.PlayerData.job.name then
-        jobLabel  = Player.PlayerData.job.label
-    end
-    
     local discordId, discordName, steamId, steamName, steamProfile = ParseIdentifiers(src)
     local profileLink = steamProfile ~= 'N/A' and ('[Click Here To View](' .. steamProfile .. ')') or 'N/A'
     
+    local targetWebhook = GetWebhook('default')
+    local embedTitle = '❌ 🔌 Player Disconnected'
+    local embedColor = 15158332 
+    local lowerReason = string.lower(reason)
+
+    if string.find(lowerReason, 'ban') or string.find(lowerReason, 'banned') then
+        embedTitle = '⛔ Player Banned From Server'
+        embedColor = 10040064 
+        targetWebhook = GetWebhook('ban')
+    elseif string.find(lowerReason, 'kick') or string.find(lowerReason, 'kicked') then
+        embedTitle = '⚠️ Player Kicked From Server'
+        embedColor = 16753920 
+        targetWebhook = GetWebhook('kick')
+    elseif string.find(lowerReason, 'exiting') or string.find(lowerReason, 'closed') then
+        embedTitle = '➜🚪 Player Disconnected (Normal Quit)'
+        embedColor = 8421504 
+    elseif string.find(lowerReason, 'timeout') or string.find(lowerReason, 'timed out') then
+        embedTitle = '⏳ 🔌 Player Timed Out / Crashed'
+        embedColor = 3447003 
+    end
+
     local fields = {
         { name = 'Player ID', value = tostring(src), inline = true },
-        { name = 'Player Name', value = inGameName, inline = true }, 
-        { name = 'Job', value = jobLabel, inline = true },
+        { name = 'Character Name', value = inGameName, inline = true },
+        { name = 'CitizenID', value = citizenid, inline = true }, 
         { name = 'Discord Name', value = discordName, inline = true },
         { name = 'Discord ID', value = discordId, inline = true },
         { name = 'Steam Name', value = steamName, inline = true },
+        { name = 'Steam ID', value = steamId, inline = true },
         { name = 'Steam Profile', value = profileLink, inline = false },
         { name = 'Reason', value = reason, inline = true },
-        { name = 'Last Coords', value = coords, inline = true }
+        { name = 'Coordinates', value = coords, inline = true }
     }
     
     local embed = { 
-        title = '❌ 🔌 Player Disconnected',  
+        title = embedTitle,  
         fields = fields, 
-        color = 15158332, 
+        color = embedColor, 
         footer = { text = os.date('%Y-%m-%d %H:%M:%S') } 
     }
-    PerformHttpRequest(webhook, function() end, 'POST', json.encode({embeds = {embed}}), { ['Content-Type'] = 'application/json' })
-    cachedNames[src] = nil
-end)
-
-AddEventHandler('RSGCore:Server:OnPlayerUnload', function(src)
-    local Player = RSGCore.Functions.GetPlayer(src)
-    if Player then
-        local inGameName = Player.PlayerData.charinfo.firstname .. ' ' .. Player.PlayerData.charinfo.lastname
-        local citizenid = Player.PlayerData.citizenid
-        
-        cachedNames[src] = inGameName
-        
-        local coords = 'Unknown'
-        if Player.PlayerData.position then
-            local pCoords = Player.PlayerData.position
-            coords = string.format('%.1f, %.1f, %.1f', pCoords.x, pCoords.y, pCoords.z)
-        end
-
-        local jobLabel = "Unknown"
-        if Player and Player.PlayerData and Player.PlayerData.job and Player.PlayerData.job.name then
-            jobLabel  = Player.PlayerData.job.label
-        end
-        
-        local discordId, discordName, steamId, steamName, steamProfile = ParseIdentifiers(src)
-        local profileLink = steamProfile ~= 'N/A' and ('[Click Here To View](' .. steamProfile .. ')') or 'N/A'
-        
-        local fields = {
-            { name = 'Player ID', value = tostring(src), inline = true },
-            { name = 'Player Name', value = inGameName, inline = true }, 
-            { name = 'CitizenID', value = citizenid, inline = true },
-            { name = 'Job', value = jobLabel, inline = true },
-            { name = 'Discord Name', value = discordName, inline = true },           
-            { name = 'Discord ID', value = discordId, inline = true },
-            { name = 'Steam Profile', value = profileLink, inline = false },
-            { name = 'Last Coords', value = coords, inline = true }
-        }
-        
-        local embed = { 
-            title = '🤠 Player Logged Out (Character Unload)', 
-            fields = fields, 
-            color = 10038562, 
-            footer = { text = os.date('%Y-%m-%d %H:%M:%S') } 
-        }
-        PerformHttpRequest(webhook, function() end, 'POST', json.encode({embeds = {embed}}), { ['Content-Type'] = 'application/json' })
-    end
+    PerformHttpRequest(targetWebhook, function() end, 'POST', json.encode({embeds = {embed}}), { ['Content-Type'] = 'application/json' })
 end)
